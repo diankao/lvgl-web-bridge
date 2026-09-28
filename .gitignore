@@ -1,0 +1,14 @@
+# 依赖
+node_modules/
+
+# 本地模拟器与构建产物 (用户自行放置, 见 README)
+sim/
+*.exe
+*.o
+
+# 录制产物
+web/videos/
+
+# 系统杂物
+.DS_Store
+Thumbs.db

@@ -1,0 +1,17 @@
+{
+  "name": "lvgl-web-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bridge a native LVGL simulator into the browser via WebSocket — Playwright-ready for automation and video recording",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "record": "node record_demo.mjs",
+    "shot": "node shot.mjs",
+    "test:native": "node test_swipe.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0",
+    "ws": "^8.0.0"
+  }
+}

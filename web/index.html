@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>LVGL Web Bridge</title>
+<style>
+  body { background: #1a1a1a; color: #ddd; font-family: system-ui, sans-serif;
+         display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px; }
+  #screen { background: #000; border-radius: 16px; box-shadow: 0 0 30px rgba(80,160,255,.25);
+            touch-action: none; cursor: pointer; image-rendering: pixelated; }
+  #tip   { font-size: 13px; opacity: .7 }
+  #status{ font-size: 12px; color: #7f7 }
+</style>
+</head>
+<body>
+  <canvas id="screen"></canvas>
+  <div id="status">连接中…</div>
+  <div id="tip">鼠标拖动 = 滑动 · 点击 = 触摸（Playwright 可直接录制本页）</div>
+<script>
+  const canvas = document.getElementById('screen');
+  const ctx2d = canvas.getContext('2d');
+  const status = document.getElementById('status');
+
+  const ws = new WebSocket(`ws://${location.host}`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => status.textContent = '已连接';
+  ws.onclose = () => status.textContent = '已断开（服务重启中…）';
+
+  let imgData = null;
+  ws.onmessage = e => {
+    const dv = new DataView(e.data);
+    if (dv.getUint32(0, true) !== 0x4c565331) return;
+    const w = dv.getUint32(4, true), h = dv.getUint32(8, true);
+
+    /* 分辨率以帧头为准, 任意尺寸自适应 (显示放大 2 倍) */
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w; canvas.height = h;
+      canvas.style.width = w * 2 + 'px';
+      canvas.style.height = h * 2 + 'px';
+      imgData = null;
+    }
+    if (!imgData) imgData = ctx2d.createImageData(w, h);
+    imgData.data.set(new Uint8ClampedArray(e.data, 12, w * h * 4));
+    ctx2d.putImageData(imgData, 0, 0);
+    status.textContent = `已连接 · ${w}x${h}`;
+  };
+
+  /* 指针事件 → 5 字节 [ev u8][x u16le][y u16le], ev: 0=移动 1=按下 2=松开 */
+  function sendEvent(ev, clientX, clientY) {
+    if (ws.readyState !== 1 || !canvas.width) return;
+    const r = canvas.getBoundingClientRect();
+    const fw = canvas.width, fh = canvas.height;
+    const x = Math.max(0, Math.min(fw - 1, Math.round((clientX - r.left) / r.width  * fw - 0.5)));
+    const y = Math.max(0, Math.min(fh - 1, Math.round((clientY - r.top)  / r.height * fh - 0.5)));
+    const b = new ArrayBuffer(5), dv = new DataView(b);
+    dv.setUint8(0, ev);
+    dv.setUint16(1, x, true);
+    dv.setUint16(3, y, true);
+    ws.send(b);
+  }
+  let pressed = false;
+  canvas.addEventListener('pointerdown', e => {
+    pressed = true; canvas.setPointerCapture(e.pointerId); sendEvent(1, e.clientX, e.clientY);
+  });
+  canvas.addEventListener('pointermove', e => { if (pressed) sendEvent(0, e.clientX, e.clientY); });
+  canvas.addEventListener('pointerup',   e => { pressed = false; sendEvent(2, e.clientX, e.clientY); });
+</script>
+</body>
+</html>
